@@ -62,4 +62,7 @@
 - Smart App Control (Windows 11) can block the unsigned image library (sharp) that HyperFrames loads for snapshots
   (the cutout loads the same library); antivirus can make ffmpeg fail once with `spawn EBUSY`. Retry once, then
   tell the user what Windows blocked.
+- Transcription dies with `Library cublas64_12.dll is not found or cannot be loaded`: the PC has an NVIDIA card, so
+  Whisper's default device ('auto') chose CUDA, but the CUDA toolkit is not installed. The scripts pass
+  `device='cpu'`; do the same in any one-off `WhisperModel(...)` call (a re-transcribed snippet, for example).
 - Windows on ARM (Snapdragon): the transcription engine has no ARM build; setup.py asks for the x64 Python.
