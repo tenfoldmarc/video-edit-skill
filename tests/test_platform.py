@@ -14,7 +14,8 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'scripts'))
-import cutout  # noqa: E402
+import layerkit  # noqa: E402
+import matte  # noqa: E402
 import setup  # noqa: E402
 import skillenv  # noqa: E402
 
@@ -226,21 +227,55 @@ class Cutout(unittest.TestCase):
     def test_spinner_output_is_split_into_lines(self):
         s = ('\x1b[?25l\x1b[2K\x1b[1G\u25d0  Loading model on CPU\x1b[2K\x1b[1G\u25d3  Frame 1/132 (0%) \u2014 645ms/frame avg'
              '\x1b[2K\x1b[1G\u25c7  Removed background from 132 frames in 54.7s (2.4 fps, CPU) \u2192 C:\\x\\subject.webm\r\n')
-        lines, rest = cutout.split_progress(s)
+        lines, rest = layerkit.split_progress(s)
         self.assertEqual(lines[0], 'Loading model on CPU')
         self.assertTrue(lines[1].startswith('Frame 1/132'))
         self.assertTrue(lines[2].startswith('Removed background from 132 frames'))
         self.assertEqual(rest, '')
 
     def test_unfinished_line_is_kept_for_next_chunk(self):
-        lines, rest = cutout.split_progress('Frame 1/132\nFrame 2/1')
+        lines, rest = layerkit.split_progress('Frame 1/132\nFrame 2/1')
         self.assertEqual((lines, rest), (['Frame 1/132'], 'Frame 2/1'))
+
+
+class MatteGeometry(unittest.TestCase):
+    def test_layer_size_keeps_aspect_and_caps_by_zoom(self):
+        self.assertEqual(matte.layer_size(2160, 3840, 1.0), (1080, 1920))
+        self.assertEqual(matte.layer_size(2160, 3840, 1.9), (2052, 3648))
+        self.assertEqual(matte.layer_size(1080, 1920, 1.9), (1080, 1920))   # never upscale
+
+    def test_canvas_mapping_matches_the_edl_zoom_rule(self):
+        self.assertAlmostEqual(matte.to_canvas(0.3, 1.0, 0.2), 0.3)          # no zoom: centre ignored
+        self.assertAlmostEqual(matte.to_canvas(0.5, 2.0, 0.5), 0.5)
+        self.assertAlmostEqual(matte.to_canvas(0.25, 2.0, 0.5), 0.0)
+        self.assertAlmostEqual(matte.to_canvas(0.25, 2.0, 0.1), 0.5)         # centre clamped to 0.25 at 2x
+
+    def test_behind_segments_come_from_texts(self):
+        edl = {'texts': [{'segment': 'a', 'layer': 'behind'}, {'segment': 'b'}, {'segment': 'a', 'layer': 'behind'},
+                         {'segment': 'c', 'layer': 'behind'}]}
+        self.assertEqual(matte.behind_segments(edl), ['a', 'c'])
+
+    def test_cache_key_changes_with_trim(self):
+        with tempfile.NamedTemporaryFile(delete=False) as fh:
+            fh.write(b'x')
+        try:
+            k1 = matte.cache_key(fh.name, {'in': 1.0, 'out': 2.0}, 1080, 'prores')
+            self.assertEqual(k1, matte.cache_key(fh.name, {'in': 1.0, 'out': 2.0}, 1080, 'prores'))
+            self.assertNotEqual(k1, matte.cache_key(fh.name, {'in': 1.0, 'out': 2.1}, 1080, 'prores'))
+            self.assertNotEqual(k1, matte.cache_key(fh.name, {'in': 1.0, 'out': 2.0}, 1080, 'hevc'))
+        finally:
+            os.remove(fh.name)
+
+    def test_alpha_args(self):
+        self.assertIn('yuva444p10le', layerkit.alpha_args('prores'))
+        self.assertIn('hevc_videotoolbox', layerkit.alpha_args('hevc'))
+        with self.assertRaises(ValueError):
+            layerkit.alpha_args('vp9')
 
 
 class NoPosixOnlyCode(unittest.TestCase):
     """Guards against the Windows breaks this skill had: shell strings, POSIX temp paths, default-encoding files."""
     FILES = [os.path.join(ROOT, 'scripts', f) for f in sorted(os.listdir(os.path.join(ROOT, 'scripts'))) if f.endswith('.py')] + [
-        os.path.join(ROOT, 'assets', 'template', 'build.py'),
         os.path.join(ROOT, 'assets', 'overlay-examples', 'claude-desktop', 'build.py'),
         os.path.join(ROOT, 'assets', 'overlay-examples', 'skill-md', 'build.py')]
 

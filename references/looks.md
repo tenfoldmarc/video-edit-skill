@@ -1,6 +1,13 @@
-# Looks (exact values)
+# Looks (design intent, applied in Edits)
 
-All three live in `assets/template/build.py`. Accent everywhere: butter yellow `#FAE67A`.
+These are the values the three looks were tuned to. In this edition Edits applies them: map each to the closest
+control discovery found (grade sliders, LUTs, text styles, fonts, text animations) and judge the result on preview
+frames, not on the numbers. CSS filter values below translate roughly as: contrast/saturation/brightness -> the
+matching grade sliders (1.07 = +7%), sepia/warm soft-light -> warmth/temperature, hue-rotate -> tint, vignette ->
+vignette. When Edits has no font from the list, use the closest it has in the same family (geometric sans, high-
+contrast serif, wide-tracked caps) and keep the size ratios. Accent everywhere: butter yellow `#FAE67A`.
+
+Effects that need a layer Edits cannot draw (words behind the head, the orbit's back copies) follow SKILL.md step 4.
 The user's default look is in `config.json` (`defaultLook`); a line in the script that names a look
 ("you can get the cool girl aesthetic like this") switches that section to it.
 
@@ -19,7 +26,7 @@ Kinetic lowercase words placed around the speaker, the big ones tucked BEHIND th
 - Type: small calm lowercase Inter 500 (64px) + one punch line in **Instrument Serif italic** in butter yellow (200px in the top band, 150px for lower blocks so 3 words fit one line). Cream text `#FFF8EF`.
 - Accents: yellow sparkles (✦) twinkling near the italic, optional handwritten note in Caveat 600 with a drawn SVG arrow (strokeDashoffset).
 - No date/time stamps: they read as clutter.
-- Signature move: the creator's own reels orbit them (orbit() in the template). Each reel tile exists twice (back copy below the cutout, front copy above), positions precomputed as GSAP keyframes every 0.1s around an ellipse, autoAlpha swapping at the ring's left/right extremes. Tiles 190x338, cream border. Keep the ring inside the safe zone.
+- Signature move: the creator's own reels orbit them. In Edits: the reel tiles as overlay clips with position keyframes around an ellipse; the half of the ring behind the speaker needs `behind` placement and the speaker layer (SKILL.md step 4), otherwise keep the whole ring in front and beside the head. Original build: each reel tile exists twice (back copy below the cutout, front copy above), positions precomputed as GSAP keyframes every 0.1s around an ellipse, autoAlpha swapping at the ring's left/right extremes. Tiles 190x338, cream border. Keep the ring inside the safe zone.
 
 ## Cool dude (editorial studio look)
 Inspired by high-end studio interview edits: dark room, lit subject, tiny tracked caps and big serif words.
@@ -29,7 +36,7 @@ Inspired by high-end studio interview edits: dark room, lit subject, tiny tracke
 - Shots: wide, then a ~1.9x close-up cropped from the 4K original (alternate wide/close like a studio interview).
 - Tried and dropped: replacing the room with an AI-generated background (looked fake), black and white, crushed-dark grades, film grain.
 
-## Fonts on hand (assets/template/assets/fonts, latin woff2 + fonts.css, SIL Open Font License)
+## Fonts on hand (assets/hyperframes/assets/fonts, used by generated inserts; Edits may not have them, latin woff2 + fonts.css, SIL Open Font License)
 Inter 500/600, Inter Tight 800/900, Instrument Serif italic, DM Serif Display (+italic), Montserrat 500/600, JetBrains Mono 500, Caveat 600.
 Add more with the Google Fonts CSS2 API + a Chrome user agent, keep only the `/* latin */` blocks, `font-display:block`.
 

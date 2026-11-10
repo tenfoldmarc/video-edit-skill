@@ -1,169 +1,169 @@
 ---
 name: video-edit
-description: "Turns raw 9:16 talking-head clips into a finished, premium Instagram reel end to end: picks the cleanest take of every line across your clips, cuts dead air, punches in from 4K, cuts you out of the background for words behind your head, applies one of three designed looks (bold kinetic words, cool girl, cool dude), builds animated UI inserts with parallel sub-agents, adds subtle sound design, and checks every cut frame by frame inside the Reels safe zone. Trigger with /video-edit or phrases like 'edit these clips', 'I dropped clips in my downloads', 'cut this into a reel', 'make this reel look fire'."
+description: "Turns raw 9:16 talking-head clips into a finished Instagram reel inside Instagram Edits for Mac, driven through its MCP automation server. Claude does the creative and analytical work (takes, cut points, look, caption copy, layout, QA); Edits does the editing (timeline, cuts, punch-ins, grade, text, captions, audio, export). For the effects Edits cannot do, such as words behind the speaker's head or animated UI inserts, the skill generates only that layer (a speaker cutout or an insert with alpha) and Edits composites it. Trigger with /video-edit or phrases like 'edit these clips', 'I dropped clips in my downloads', 'cut this into a reel', 'make this reel look fire'."
 ---
 
-# /video-edit
+# /video-edit (Instagram Edits edition)
 
-Raw clips in, finished reel out. The user never opens an editor: they review a phone copy and give notes; every
-round is a ~2 minute re-render.
+Raw clips in, finished reel out, in an Edits project the user can open and touch by hand. Notes from the user
+become changes to `edl.json`, and the skill reconciles the Edits timeline to it: a re-run with an unchanged EDL
+changes nothing, a note like "cut the pause before X" touches one segment.
 
-Read before building: `references/looks.md` (the three looks, exact values), `references/layout.md` (safe zone,
-placement, behind-head formula), `references/gotchas.md` (every trap already hit once). Read
-`references/overlays.md` when the script calls for an animated insert.
+## Who does what (the core rule)
 
-Works on macOS, Linux and Windows. setup.py detects the machine at the start of every run and every command below
-comes from that record, so never guess paths or shells: see "This machine" right after Step 0.
+| Claude (analysis and art direction) | Edits (all editing) | Generated layers (only when Edits can't) |
+|---|---|---|
+| Contact sheets, transcripts, speech map | Import, timeline, clip order and trims | Speaker cutout with alpha, per segment, for words behind the head (`matte.py`) |
+| Rebuilds the script, picks takes, cut points | Punch-ins (scale/position), transitions | Animated UI inserts with alpha (sub-agents + `alphamov.py`) |
+| Look design, layout math, caption copy | Grade/LUT, text, captions, animations | |
+| Where SFX go and how loud | Audio placement and volume | |
+| QA of frames and audio | Preview frames, export, (posting, only by the user) | |
 
-## Step 0: First-time setup (runs once)
+Claude never renders or encodes the reel. The only video files Claude writes are layers with alpha for one segment
+or one insert, and the intermediates that produce them. Everything else is an ffprobe/ffmpeg read that ends in
+JSON, text or a JPG to look at.
 
-`SK` is this skill's folder (the one holding this SKILL.md), as a full path. Usually `~/.claude/skills/video-edit`;
-on Windows that is `C:/Users/<name>/.claude/skills/video-edit`.
+Read before building: `references/edits-adapter.md` (talking to Edits: bridge, discovery, layer stacking,
+reconcile, traps), `references/layout.md` (safe zone and behind-head maths in Edits' normalised canvas),
+`references/looks.md` (the three looks as design intent, mapped to what Edits offers), `references/gotchas.md`.
+Read `references/overlays.md` only when the script calls for an animated insert.
 
-Look for `SK/config.json`.
+macOS on Apple silicon only: Edits desktop exists nowhere else.
 
-**If it exists:** load it (name, instagram handle, default look, folders), run the setup script exactly as in
-step 3 below (a few seconds: it only checks, and repairs the environment after an update), read "This machine",
-and go to Step 1 once it prints READY.
+## Step 0: Setup
 
-**If it does not exist:**
-1. Say: "Welcome to /video-edit! Let's get you set up. This takes about 2 minutes and only happens once."
-2. Ask, in one message:
-   - Your name (used on your Instagram profile insert)
-   - Your Instagram handle (for your profile insert and to pull your reels for the orbit effect)
-   - Default look: **bold** (kinetic words behind your head), **cool girl** (warm, yellow serif italic, your reels
-     orbiting you) or **cool dude** (dark editorial, tracked caps + serif). Offer bold if they are unsure.
-   - Where your raw clips usually land (default `~/Downloads`) and where projects should live (default `~/reel-edits`)
-3. Run the setup script with whichever Python the machine has. Try these in order until one prints STATUS lines:
-   `python3 "SK/scripts/setup.py"`, then `python "SK/scripts/setup.py"`, then `py -3 "SK/scripts/setup.py"`.
-   (On Windows `python3` is often a Microsoft Store stub that prints "Python was not found": just try the next one.)
-   None of them runs: Python is missing. Give the fix for their system and stop (Windows:
-   `winget install --id Python.Python.3.12 -e`, Mac: `brew install python`, Linux: `sudo apt install python3 python3-venv`).
-   Then read the STATUS lines:
-   - ffmpeg / node / python venv MISSING: the line ends with the exact fix for THIS machine (winget on Windows,
-     brew on Mac, apt on Linux). Give it to the user and stop until the script prints READY.
-   - Windows: the user pastes the winget lines into their own PowerShell window (winget asks them to agree to its
-     terms the first time), then quits Claude Code completely and reopens it, or the new programs are not found.
-   - The script downloads the 6 sound effects itself. If it still reports them MISSING (offline), that is optional:
-     the reel just has no SFX until they are added.
-4. Optional, Apify (pulls reels and profile stats automatically): try a simple Apify MCP call. If it is not
-   connected, say it is optional and how to add it:
-   1. Create a free account at https://apify.com and copy the API token from Settings > API & Integrations.
-   2. In a terminal, paste this one line with the token in place of YOUR_TOKEN:
-      `claude mcp add apify -e APIFY_TOKEN=YOUR_TOKEN -- npx -y @apify/actors-mcp-server`
-      (heads up: Claude Code stores the token in plain text in `~/.claude.json`; keep that file private).
-   3. Reopen Claude and run /video-edit again.
-   Without Apify, the skill asks them to drop their reel files into the project instead.
-5. Save `SK/config.json` (no secrets, ever):
+`SK` is this skill's folder (the one holding this SKILL.md), as a full path, usually `~/.claude/skills/video-edit`.
+
+Every run: run `python3 "SK/scripts/setup.py"`, read the STATUS lines, then read `SK/.platform.json`.
+- ffmpeg / node / python venv MISSING: give the exact fix the line ends with and stop until it prints READY.
+- `edits` MISSING or automation server OFF: give the fix from the line and stop. Edits must stay open during the run.
+- `alpha layers can be written as`: the codecs this ffmpeg can write (hevc needs VideoToolbox, prores always works).
+- Sound effects MISSING is optional.
+
+`PY` = the `python` value in `.platform.json` (the skill's venv: faster-whisper, Pillow). Run every script with it.
+
+First run only (no `SK/config.json`):
+1. Say: "Welcome to /video-edit! Let's get you set up. This takes a few minutes and only happens once."
+2. Ask in one message: name, Instagram handle, default look (**bold**, **cool girl**, **cool dude**; offer bold if
+   unsure), where raw clips land (default `~/Downloads`) and where projects live (default `~/Movies/reel-edits`;
+   it must be under `~/Movies`, Edits' sandbox refuses the rest).
+3. Check the MCP chain: the `edits` server must come through the `insta-edits` bridge (in `/mcp`; with the CLI,
+   `insta-edits doctor` all green). Not there: give the install from the adapter and stop. A direct HTTP entry to
+   127.0.0.1:19501 is not enough, Claude would never see the editor's tools.
+4. Run discovery (adapter, "Discovery") and save `SK/edits-capabilities.json`. It decides, among other things,
+   whether Edits does behind-head itself, whether it accepts alpha layers and in which codec.
+5. Optional Apify for the user's own reels (orbit, profile insert): as in overlays.md. Without it, ask for files.
+6. Save `SK/config.json` (no secrets, never the Edits token):
    ```json
    {"name": "...", "instagram": "handle-without-@", "defaultLook": "bold", "clipsDir": "~/Downloads",
-    "projectsDir": "~/reel-edits", "setupComplete": true, "setupDate": "YYYY-MM-DD"}
+    "projectsDir": "~/Movies/reel-edits", "setupComplete": true, "setupDate": "YYYY-MM-DD"}
    ```
-6. Say: "Setup complete! Running /video-edit now..." and continue.
 
-## This machine (read on every run)
-
-Read `SK/.platform.json`, written by setup.py. It records the OS (`os`: macos, linux or windows), the CPU and the
-exact commands for this computer:
-- `PY` = its `python` value: the skill's own Python (`.venv/bin/python` on Mac and Linux,
-  `.venv/Scripts/python.exe` on Windows). Run EVERY Python script of this skill with it, never a bare `python3`.
-- `HF` = `PY "SK/scripts/hf.py"`: starts the pinned HyperFrames (`npx --yes hyperframes@0.8.34 ...`) with the
-  right Node on any OS. No `nvm use`, no `npx.cmd` trouble.
-- `cutout`: `CoreML` (Apple Silicon) or `CPU` (Windows, Linux, Intel Macs: no GPU help, so the cutout step is the
-  slow one; say so, run it in the background and keep building).
-
-setup.py rewrites this file on every run (Step 0), so it is always current. File missing, or `PY` no longer
-exists: setup did not run or did not reach READY; run it as in Step 0.3 and follow its fix.
-
-One command style that works in zsh, bash, Git Bash and PowerShell:
-- Full paths in double quotes with forward slashes (fine on Windows too): `"PY" "SK/scripts/ingest.py" "<project>"`.
-- In PowerShell (Windows without Git for Windows, or whenever the PowerShell tool is the one you have) put `&` in
-  front: `& "PY" "SK/scripts/ingest.py" "<project>"`.
-- One command per call. No `&&`, no `VAR=1 command`, no `~` inside arguments, no `source`, no `zsh`.
-- `ffmpeg` and `ffprobe` are on PATH on every OS (setup checks it), so one-off ffmpeg commands are the same everywhere.
+Later runs: if Edits' app version or automation schema differs from `edits-capabilities.json`, or a mapped tool is
+missing, re-run discovery before editing.
 
 ## Hard rules
-1. Everything inside the Reels safe zone: top 220, bottom 450 (nothing below y 1470), sides 35, right 100 from y 1155.
-2. Never cover the face with text or cards. Behind-head words show at least ~70% of each letter.
-3. Captions say what was actually said: fix Whisper's mishearings of names and keywords ("Claude" often comes out
-   as "cloud"/"claws", "skill" as "scale"). No em dashes in on-screen text.
-4. Sound effects subtle (template `SFX_GAIN = 0.75` of the base volumes), never louder than the voice.
-5. Credit other creators on screen (@handle) whenever their reels appear. Real numbers on the user's own profile;
-   anything else (commenters, chat history) is a generic placeholder, never a real person, never fabricated proof.
-6. Prove cuts from the final render, not from snapshots.
-7. Never delete the user's files. Originals are read, never modified.
+1. Safe zone, in Edits' normalised canvas (0..1, origin top-left; confirmed by discovery): nothing above y 0.115 or
+   below y 0.766, side margins 0.033, right margin 0.093 from y 0.602 down (IG action rail).
+2. Never cover the face with text, cards or inserts. Behind-head words show at least ~70% of each letter.
+3. Captions say what was actually said: fix mishearings ("Claude" -> "cloud"/"claws", "skill" -> "scale").
+   No em dashes in on-screen text.
+4. SFX subtle (0.75 of the base level), never louder than the voice; voice peaks around -2 to -5 dB on the export.
+5. Credit other creators on screen (@handle) when their reels appear. Real numbers on the user's own profile only;
+   anything else is a generic placeholder, never a real person, never fabricated proof.
+6. Prove cuts and layer alignment from the exported file (`qa_export.py`), not from what a tool call claimed.
+7. Never publish, share or schedule from Edits. The user posts from the Edits window. Only an explicit go-ahead
+   for that specific video changes this.
+8. No Edits library songs in automated exports (they export silent). Use the user's own audio, or leave the song
+   to the user in the Edits window and say so.
+9. Originals are read, never modified or deleted. Edits imports copies from `<project>/media/`.
+10. Every change goes through `edl.json` and the reconcile loop. No ad-hoc timeline pokes.
 
 ## Workflow
 
 ### 1. Intake
-- Clips: the files the user names, else the newest video files in `clipsDir`. Create `<projectsDir>/<short-slug>/`.
-  (`~` in config.json is the user's home folder, `C:/Users/<name>` on Windows. The skill's scripts expand it.)
-- Reference links (IG reels, Pinterest pins) for a style: download them and look at frames before designing anything
-  (see overlays.md for how to fetch them).
+- Clips: the files the user names, else the newest videos in `clipsDir`. Create `<projectsDir>/<slug>/` (absolute
+  path, under `~/Movies`).
+- Style references (reels, pins): look at their frames before designing anything (overlays.md says how to fetch).
 
-### 2. Ingest
+### 2. Ingest and stage
 ```bash
 PY SK/scripts/ingest.py <project> <clips or folder> [--newest 5]
+PY SK/scripts/stage.py <project> --sfx whoosh-short,pop
 ```
-Look at `work/sheets.jpg` (setups and angles) and read `transcript.txt` (per-clip lines, words with times, speech map).
+Look at `work/sheets.jpg` (setups, angles), read `transcript.txt` (lines, word times, speech map). `stage.py` copies
+clips and chosen SFX into `media/` and writes `media.json`, the only paths Edits imports from.
 
-### 3. Pick takes -> `<project>/edl.json`
-- Rebuild the script from the takes: people repeat a line until it lands. Use the LAST complete clean take unless
-  the user says otherwise ("the better section starts at 0:47" means one continuous take from there).
-- In/out points from the speech map: start ~0.05-0.07s before the first word, end at the silence start after the
-  last word. Kill dead air between sections; confirm short pauses with silencedetect before trimming (Whisper can
-  invent a leading word at a cut).
-- Two segments in a row from the same angle: punch one in (zoom 1.3-1.9 from the 4K original, cx/cy on the chest).
-- Unsure words (keyword, CTA trigger): re-transcribe that snippet with medium.en and a prompt containing the names.
-- Format: `[{"id": "hook", "clip": "c1", "in": 12.66, "out": 15.72, "zoom": 1.0, "cx": 0.5, "cy": 0.5, "line": "..."}]`
-- Post the EDL to the user as a short table (line, clip, look per section) and keep going; do not wait.
+### 3. Pick takes and design -> `<project>/edl.json` (desired state)
+- Rebuild the script from the takes; use the LAST complete clean take of each line unless the user says otherwise.
+- In ~0.05-0.07 s before the first word, out at the silence start after the last word. Confirm short pauses with
+  silencedetect (Whisper invents a leading word at cuts). Zero dead air between sections.
+- Two segments in a row from the same angle: punch one in (zoom 1.3-1.9, centred on the chest).
+- Unsure words (names, CTA keyword): re-transcribe that snippet with medium.en and a prompt holding the names.
+- Look per section: `defaultLook`, and a line that names a look switches its section.
+- Times of texts, inserts and SFX are relative to their segment's start, so trims never shift them by accident.
+  ```json
+  {"version": 1, "project": "<Edits project name or id>", "look": "bold",
+   "segments": [{"id": "hook", "clip": "c1", "in": 12.66, "out": 15.72, "zoom": 1.0, "cx": 0.5, "cy": 0.45,
+                 "look": "bold", "line": "Everybody is doing this wrong"}],
+   "texts":    [{"id": "t-wrong", "segment": "hook", "words": "wrong", "at": 2.1, "dur": 0.9, "x": 0.5,
+                 "y": 0.21, "size": 220, "style": "bold-big", "layer": "behind"}],
+   "inserts":  [{"id": "ig", "file": "media/inserts/ig-follow.mov", "segment": "cta", "at": 0.3, "dur": 2.9,
+                 "x": 0.5, "y": 0.62, "scale": 0.7, "layer": "front"}],
+   "audio":    [{"id": "sfx1", "sfx": "pop", "segment": "hook", "at": 2.1, "gain": 0.75}]}
+  ```
+  `layer`: `front` (above the speaker) or `behind` (between the base clip and the speaker cutout).
+- Post the EDL as a short table (line, clip, look, behind-head words) and keep going; do not wait.
 
-### 4. Assemble, transcribe, cut out
-```bash
-PY SK/scripts/assemble.py <project>                 # aroll.mp4 clean 30fps CFR + segments.json with exact frames
-PY SK/scripts/transcribe_cut.py <project> "<names and keywords in the script>"
-PY SK/scripts/cutout.py <project>                   # run in background; asserts cutout frames == aroll frames
-PY SK/scripts/headpos.py <project>                  # after the cutout: head/body position per segment
-```
-One cutout at a time (about 1.5 GB of RAM). It prints a progress line every 30 seconds.
+### 4. Behind-head words and inserts (start as soon as the EDL is locked; run in the background)
+Pick the path from `edits-capabilities.json` once, record it in `<project>/analysis.json`, tell the user if it is
+not the first:
+1. **Edits segments the speaker itself** (a cutout/segmentation tool exists): apply it to the duplicated segment
+   in Edits. No generated layer.
+2. **Edits accepts alpha video**: `PY SK/scripts/matte.py <project> [--codec hevc|prores]` cuts the speaker out of
+   every segment with a `behind` item, straight from the original, and writes `media/layers/<id>-<key>.mov` +
+   `layers.json` (frames checked, alpha checked, head position per segment). Cached by segment: a note round only
+   re-cuts trimmed segments. One run at a time, ~7 s per second of footage.
+3. **Neither**: move the word in front, beside the head or over the chest, and say the behind-head move is not
+   possible with this Edits build.
+Place behind-head words with `layers.json` -> `head.canvas_head_top` and the formula in layout.md. `head.moving`
+true means the head moves during the segment: put that word in front instead.
 
-### 5. Inserts in parallel (as soon as the EDL is locked)
-For each animated insert the script calls for (an app on screen, the profile follow on the CTA, a file scroll),
-spawn a sub-agent in the background with the brief template in `references/overlays.md`: fixed size, fixed
-duration, beats locked to the word times, transparent webm out. Keep building the main edit while they work.
+Animated inserts: one sub-agent per insert with the brief in overlays.md (transparent WebM), then
+`PY SK/scripts/alphamov.py <in.webm> <project>/media/inserts/<name>.mov --codec <codec>`. Keep building meanwhile.
 
-### 6. Build
-Copy `SK/assets/template/` into the project (build.py, hyperframes.json, package.json, assets/fonts, assets/sfx),
-then adapt build.py. It is the finished build of a real reel: keep the machinery, rewrite the content (its
-docstring lists which is which).
-- Which look where: `defaultLook` for the whole reel; a line that names a look switches its section.
-- Orbit and profile grid use the user's own reels (overlays.md: Apify post scraper with their handle, or files they
-  drop into `assets/reels/`).
-- Iterate from the project folder: `HF lint` (0 errors), then `PY build.py --safe`, then
-  `HF snapshot --at <10-20 moments> --no-end --describe false`. Read the contact sheets, fix layout, readability
-  and safe zone. (`HF` picks the right Node by itself, so there is no `nvm use`.)
-  A build.py copied from an older version of this skill ignores `--safe`: if the red guide is missing from the
-  snapshots, build that project the old way, `SAFE=1 "PY" build.py` (such projects only exist on Mac and Linux).
+### 5. Reconcile into Edits
+Follow the adapter's reconcile contract: open or create the project, wait for the editor tools, import from
+`media.json`/`layers.json`/inserts, read the timeline, diff by EDL ids, apply the diff in order (clip timing ->
+transforms -> layers -> grade -> captions and texts -> audio), read back and assert.
+- A speaker layer gets exactly the base segment's start, duration and transform (zoom/cx/cy). Stacking, bottom to
+  top: base clip, `behind` texts/inserts, speaker layer, `front` texts, captions, `front` inserts.
+- Captions: generate them in Edits, then overwrite every line with Claude's corrected copy; keep Edits' timing unless
+  it crosses a word boundary.
 
-### 7. Render and QA
-```bash
-PY build.py           # without --safe
-HF render -o renders/<slug>-vN.mp4 --quality high      # ~1.5-2 min for a 25s reel on Apple Silicon
-PY SK/scripts/check_cuts.py <project> renders/<slug>-vN.mp4 --phone
-```
-Look at `work/cut_check.jpg`: every after-cut frame shows the new shot cleanly. Check audio peaks (`volumedetect`,
-max around -2 to -5 dB) and the silence at section joins.
+### 6. Look
+Edits does the pixels, Claude chooses: looks.md gives the intent per look and how to map it to Edits' grade
+controls, LUTs, fonts and text animations listed in discovery. Hard cuts by default; punch-ins carry the variety.
+
+### 7. Export and QA
+- Export from Edits to `<project>/renders/<slug>-vN.mp4` (and a 720p copy if Edits offers it).
+- `PY SK/scripts/qa_export.py <project> renders/<slug>-vN.mp4 --cuts <cut times read back from the timeline>
+  --at <every behind-head word, text entry, insert>`. Look at `work/qa/cut_check.jpg` (each after-cut frame shows
+  the new shot, no speaker layer from the previous shot) and every `at_*.jpg` (safe zone, face clear, behind-head
+  letters readable, speaker layer aligned with the base: no double edge or halo).
+- Audio line: max around -2 to -5 dB. Silent export with music on the timeline = rule 8.
+- Fix through the EDL and reconcile again.
 
 ### 8. Deliver
-Send or point to the phone copy (720p) and the full-quality render. Report in plain terms what changed and anything
-that needs the user's call. Keep every version in `renders/`; back up `assets/` + `segments.json` to `work/vN/` before
-re-assembling.
+Point to the export (and phone copy). Say in plain terms what changed since the last version, which path step 4
+used, and anything that needs the user's call (music, posting). Keep every `edl.vN.json`; any version can be
+rebuilt by reconciling to it. The reel is posted by the user from the Edits window.
 
 ## Defaults that came out of real feedback (do not re-litigate)
-- Change the grade and captions to create a look; do not replace the background with an AI-generated room.
+- Change the grade and captions to create a look; never replace the background with an AI-generated room.
 - No film grain. Dark is fine, but keep the subject lit and skin from going red.
 - Lead-in captions centred in front of the speaker read better than lines pinned to the left edge.
 - Words behind the head are the signature move, but only when readable.
 
 ---
-Built by [@tenfoldmarc](https://instagram.com/tenfoldmarc). Follow for daily AI automation builds, real systems, not theory.
+Original skill by [@tenfoldmarc](https://instagram.com/tenfoldmarc). This edition hands the editing to Instagram Edits for Mac.
