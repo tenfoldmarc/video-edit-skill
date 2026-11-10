@@ -1,7 +1,7 @@
 # Video Edit, Instagram Edits edition
 ### A fork of [tenfoldmarc/video-edit-skill](https://github.com/tenfoldmarc/video-edit-skill) that edits inside Instagram Edits for Mac
 
-Film your talking-head clips, drop them in a folder, type `/video-edit`. Claude picks your best take of every line, cuts the dead air and designs the look; **Instagram Edits does the editing** through its built-in MCP automation server. You end up with a normal Edits project you can open, tweak by hand and post from.
+Film your talking-head clips, drop them in a folder, type `/video-edit-insta-edits`. Claude picks your best take of every line, cuts the dead air and designs the look; **Instagram Edits does the editing** through its built-in MCP automation server. You end up with a normal Edits project you can open, tweak by hand and post from.
 
 The original skill rendered the whole reel itself with HyperFrames. This edition only generates what Edits can't draw (the cutout of you that lets words sit behind your head, and animated UI inserts), as layers with alpha that Edits stacks on its own timeline.
 
@@ -43,9 +43,9 @@ Behind-head words need Edits to accept a video layer with transparency (or to cu
    Paste the token when asked (it goes to your keychain), then restart Claude Code. `/mcp` should list `edits`.
 3. Install the skill:
    ```bash
-   git clone https://github.com/erivaldodantas/video-edit-skill-instagram-edits "$HOME/.claude/skills/video-edit"
+   git clone https://github.com/erivaldodantas/video-edit-skill-instagram-edits "$HOME/.claude/skills/video-edit-insta-edits"
    ```
-4. Run `/video-edit`. The first run asks your name, handle and favourite look, checks your tools, and probes what your Edits build can do (it works in a throwaway Edits project and deletes it afterwards).
+4. Run `/video-edit-insta-edits`. It installs under its own name, so it can live next to the original `/video-edit`. The first run asks your name, handle and favourite look, checks your tools, and probes what your Edits build can do (it works in a throwaway Edits project and deletes it afterwards).
 
 Projects live under `~/Movies/reel-edits` by default: Edits is sandboxed and refuses to import from Downloads, Desktop or temp folders, so the skill copies your clips there. Your originals are never changed.
 
@@ -54,8 +54,8 @@ Projects live under `~/Movies/reel-edits` by default: Edits is sandboxed and ref
 ## Usage
 
 ```
-/video-edit I just dropped 5 clips in my downloads
-/video-edit use the cool girl look when I say "the cool girl aesthetic", bold everywhere else
+/video-edit-insta-edits I just dropped 5 clips in my downloads
+/video-edit-insta-edits use the cool girl look when I say "the cool girl aesthetic", bold everywhere else
 the captions feel too small, and cut the pause before "or you can get"
 ```
 

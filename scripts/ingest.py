@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Register raw clips for a /video-edit project, make contact sheets, transcribe every clip.
+"""Register raw clips for a /video-edit-insta-edits project, make contact sheets, transcribe every clip.
 
 Usage (run with PY, the skill's Python from .platform.json; it has faster-whisper):
   PY ingest.py <project_dir> <clip files or one folder> [--newest N]

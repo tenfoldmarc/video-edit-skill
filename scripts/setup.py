@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""/video-edit first-run checks, for macOS, Linux (and WSL) and Windows. Safe to re-run: it only reports and fills
+"""/video-edit-insta-edits first-run checks, for macOS, Linux (and WSL) and Windows. Safe to re-run: it only reports and fills
 in what is missing. Standard library only, because it runs before the skill's own Python environment exists.
 
 Run it with whichever Python the machine has:   python3 setup.py   |   python setup.py   |   py -3 setup.py
@@ -30,7 +30,7 @@ import skillenv  # noqa: E402
 
 SFX_NAMES = ['whoosh-short', 'pop', 'sparkle', 'click', 'click-soft', 'impact-bass-1']
 SFX_URL = 'https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/media-use/audio/assets/sfx'
-RESTART = 'then quit Claude Code completely, reopen it and run /video-edit again'
+RESTART = 'then quit Claude Code completely, reopen it and run /video-edit-insta-edits again'
 
 
 def fix(what, osn):
@@ -76,7 +76,7 @@ def check_ffmpeg(osn):
         where = os.path.dirname(found['ffmpeg'][0])
         if osn == 'windows':
             say(f'STATUS ffmpeg INSTALLED BUT NOT VISIBLE YET (found in {where}) -> this session started before it was '
-                f'installed: quit Claude Code completely, reopen it and run /video-edit again')
+                f'installed: quit Claude Code completely, reopen it and run /video-edit-insta-edits again')
         else:
             say(f'STATUS ffmpeg NOT ON PATH (found in {where}) -> add that folder to your PATH, then reopen Claude Code')
         return False, None, None

@@ -1,9 +1,9 @@
 ---
-name: video-edit
-description: "Turns raw 9:16 talking-head clips into a finished Instagram reel inside Instagram Edits for Mac, driven through its MCP automation server. Claude does the creative and analytical work (takes, cut points, look, caption copy, layout, QA); Edits does the editing (timeline, cuts, punch-ins, grade, text, captions, audio, export). For the effects Edits cannot do, such as words behind the speaker's head or animated UI inserts, the skill generates only that layer (a speaker cutout or an insert with alpha) and Edits composites it. Trigger with /video-edit or phrases like 'edit these clips', 'I dropped clips in my downloads', 'cut this into a reel', 'make this reel look fire'."
+name: video-edit-insta-edits
+description: "Turns raw 9:16 talking-head clips into a finished Instagram reel inside Instagram Edits for Mac, driven through its MCP automation server. Claude does the creative and analytical work (takes, cut points, look, caption copy, layout, QA); Edits does the editing (timeline, cuts, punch-ins, grade, text, captions, audio, export). For the effects Edits cannot do, such as words behind the speaker's head or animated UI inserts, the skill generates only that layer (a speaker cutout or an insert with alpha) and Edits composites it. Trigger with /video-edit-insta-edits or when the user asks to edit clips into a reel in Instagram Edits (for example 'edit these clips in Edits', 'cut this into a reel with Edits'). If the original /video-edit skill is also installed, generic 'edit my clips' requests without Edits belong to it."
 ---
 
-# /video-edit (Instagram Edits edition)
+# /video-edit-insta-edits
 
 Raw clips in, finished reel out, in an Edits project the user can open and touch by hand. Notes from the user
 become changes to `edl.json`, and the skill reconciles the Edits timeline to it: a re-run with an unchanged EDL
@@ -32,7 +32,8 @@ macOS on Apple silicon only: Edits desktop exists nowhere else.
 
 ## Step 0: Setup
 
-`SK` is this skill's folder (the one holding this SKILL.md), as a full path, usually `~/.claude/skills/video-edit`.
+`SK` is this skill's folder (the one holding this SKILL.md), as a full path, usually `~/.claude/skills/video-edit-insta-edits`. Its own folder keeps its config, venv and
+capability map apart from the original /video-edit skill if both are installed.
 
 Every run: run `python3 "SK/scripts/setup.py"`, read the STATUS lines, then read `SK/.platform.json`.
 - ffmpeg / node / python venv MISSING: give the exact fix the line ends with and stop until it prints READY.
@@ -43,7 +44,7 @@ Every run: run `python3 "SK/scripts/setup.py"`, read the STATUS lines, then read
 `PY` = the `python` value in `.platform.json` (the skill's venv: faster-whisper, Pillow). Run every script with it.
 
 First run only (no `SK/config.json`):
-1. Say: "Welcome to /video-edit! Let's get you set up. This takes a few minutes and only happens once."
+1. Say: "Welcome to /video-edit-insta-edits! Let's get you set up. This takes a few minutes and only happens once."
 2. Ask in one message: name, Instagram handle, default look (**bold**, **cool girl**, **cool dude**; offer bold if
    unsure), where raw clips land (default `~/Downloads`) and where projects live (default `~/Movies/reel-edits`;
    it must be under `~/Movies`, Edits' sandbox refuses the rest).
