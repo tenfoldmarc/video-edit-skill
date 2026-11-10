@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared machine helpers for /video-edit (macOS, Linux, WSL, Windows). Standard library only: setup.py imports
+"""Shared machine helpers for /video-edit-insta-edits (macOS, Linux, WSL, Windows). Standard library only: setup.py imports
 this before the venv exists. Nothing here talks to the network; detection is local.
 
 What lives here:
