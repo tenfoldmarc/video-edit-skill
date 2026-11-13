@@ -2,8 +2,8 @@ config.json
 .platform.json
 .venv/
 __pycache__/
-assets/template/assets/sfx/*.mp3
-assets/template/assets/sfx/*.part
+assets/hyperframes/assets/sfx/*.mp3
+assets/hyperframes/assets/sfx/*.part
 *.log
 .DS_Store
 node_modules/

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""/video-edit first-run checks, for macOS, Linux (and WSL) and Windows. Safe to re-run: it only reports and fills
+"""/video-edit-insta-edits first-run checks, for macOS, Linux (and WSL) and Windows. Safe to re-run: it only reports and fills
 in what is missing. Standard library only, because it runs before the skill's own Python environment exists.
 
 Run it with whichever Python the machine has:   python3 setup.py   |   python setup.py   |   py -3 setup.py
@@ -8,7 +8,9 @@ Run it with whichever Python the machine has:   python3 setup.py   |   python se
   2. Node 22+ (HyperFrames renders with it; an nvm / Homebrew / installer copy is picked up even when an older
      Node is the default)
   3. Python 3.10+ and a venv inside the skill with faster-whisper + Pillow (transcription, head tracking)
-  4. Sound effects in assets/template/assets/sfx (not bundled: the Pixabay license forbids redistributing the files)
+  4. Sound effects in assets/hyperframes/assets/sfx (not bundled: the Pixabay license forbids redistributing the files)
+  5. Instagram Edits for Mac and its automation server (the editor this skill drives), and which alpha codecs this
+     ffmpeg can write for the layers handed to Edits
 
 Prints a STATUS line per item, each with the fix for THIS machine, then READY or NOT READY. Exit code 0 only when
 everything is ready. Writes <skill>/.platform.json (os, arch, the venv Python, how to start npx) so the other
@@ -20,6 +22,7 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -27,7 +30,7 @@ import skillenv  # noqa: E402
 
 SFX_NAMES = ['whoosh-short', 'pop', 'sparkle', 'click', 'click-soft', 'impact-bass-1']
 SFX_URL = 'https://raw.githubusercontent.com/heygen-com/hyperframes/main/skills/media-use/audio/assets/sfx'
-RESTART = 'then quit Claude Code completely, reopen it and run /video-edit again'
+RESTART = 'then quit Claude Code completely, reopen it and run /video-edit-insta-edits again'
 
 
 def fix(what, osn):
@@ -73,7 +76,7 @@ def check_ffmpeg(osn):
         where = os.path.dirname(found['ffmpeg'][0])
         if osn == 'windows':
             say(f'STATUS ffmpeg INSTALLED BUT NOT VISIBLE YET (found in {where}) -> this session started before it was '
-                f'installed: quit Claude Code completely, reopen it and run /video-edit again')
+                f'installed: quit Claude Code completely, reopen it and run /video-edit-insta-edits again')
         else:
             say(f'STATUS ffmpeg NOT ON PATH (found in {where}) -> add that folder to your PATH, then reopen Claude Code')
         return False, None, None
@@ -198,7 +201,7 @@ def fetch(url, dest):
 
 
 def check_sfx():
-    sfx = os.path.join(skillenv.SKILL_DIR, 'assets', 'template', 'assets', 'sfx')
+    sfx = os.path.join(skillenv.SKILL_DIR, 'assets', 'hyperframes', 'assets', 'sfx')
     os.makedirs(sfx, exist_ok=True)
 
     def have(n):
@@ -225,6 +228,44 @@ def check_sfx():
     return not missing
 
 
+EDITS_URL = os.environ.get('EDITS_MCP_URL', 'http://127.0.0.1:19501/mcp')
+
+
+def check_edits(osn):
+    """Edits desktop exists only on macOS (Apple silicon). The automation server answers 401/403 without a token,
+    which is the expected 'it is up' reply here: setup never reads or sends the token."""
+    if osn != 'macos':
+        say('STATUS edits MISSING -> Instagram Edits desktop only runs on macOS with Apple silicon. This edition of the'
+            ' skill cannot edit on this machine.')
+        return {'app': False, 'server': False}
+    app = any(os.path.isdir(p) for p in ('/Applications/Edits.app',
+                                         os.path.join(os.path.expanduser('~'), 'Applications', 'Edits.app')))
+    server = False
+    try:
+        urllib.request.urlopen(urllib.request.Request(EDITS_URL, method='GET'), timeout=3)
+        server = True
+    except urllib.error.HTTPError:
+        server = True          # 401/403/405: something is listening and refusing us, as expected without a token
+    except Exception:
+        server = False
+    if not app:
+        say('STATUS edits MISSING -> install Edits for Mac (free) from https://edits.instagram.com/desktop and sign in')
+    elif not server:
+        say('STATUS edits automation server OFF -> open Edits, Settings > Automation > Enable Automation Server, keep'
+            ' Edits open, then re-run this script')
+    else:
+        say(f'STATUS edits OK (automation server answering at {EDITS_URL})')
+    return {'app': app, 'server': server}
+
+
+def alpha_codecs(ffmpeg):
+    out = subprocess.run([ffmpeg, '-hide_banner', '-encoders'], **skillenv.TEXT).stdout if ffmpeg else ''
+    have = {line.split()[1] for line in out.splitlines() if line.startswith(' ') and len(line.split()) > 1}
+    codecs = [c for c, enc in (('hevc', 'hevc_videotoolbox'), ('prores', 'prores_ks')) if enc in have]
+    say(f"STATUS alpha layers can be written as: {', '.join(codecs) or 'NOTHING (ffmpeg without prores_ks)'}")
+    return codecs
+
+
 # ------------------------------------------------------------------ main
 def main():
     skillenv.utf8_stdio()
@@ -238,6 +279,8 @@ def main():
     node_ok, node, node_ver, npx = check_node(osn)
     py_ok, py = check_python(info)
     sfx_ok = check_sfx()
+    edits = check_edits(osn)
+    codecs = alpha_codecs(ffmpeg if ff_ok else None)
     ready = ff_ok and node_ok and py_ok
 
     sp = skillenv.shell_path
@@ -255,6 +298,8 @@ def main():
         'hyperframes': skillenv.HYPERFRAMES,
         'cutout': provider,
         'sfx': sfx_ok,
+        'edits': edits,                                            # app installed / automation server answering
+        'alpha_codecs': codecs,                                    # for matte.py / alphamov.py --codec
     }
     with open(skillenv.PLATFORM_FILE, 'w', encoding='utf-8') as f:
         json.dump(record, f, indent=1)
